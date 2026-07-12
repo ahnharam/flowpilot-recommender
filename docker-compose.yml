@@ -1,0 +1,63 @@
+name: flowpilot
+
+services:
+  api:
+    build:
+      context: ./back
+    image: flowpilot-api:local
+    container_name: flowpilot-api
+    restart: always
+    environment:
+      APP_ENV: production
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8001}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 15s
+    networks:
+      - flowpilot-net
+
+  web:
+    build:
+      context: ./front
+    image: flowpilot-web:local
+    container_name: flowpilot-web
+    restart: always
+    environment:
+      API_URL: http://api:8000
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      STREAMLIT_SERVER_PORT: "8501"
+    ports:
+      - "${APP_HOST_PORT:-8502}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 20s
+    networks:
+      - flowpilot-net
+
+networks:
+  flowpilot-net:
+    driver: bridge
